@@ -50,3 +50,84 @@ class CodeOutput(BaseModel):
     filename: str = Field(description="Suggested filename")
     code: str = Field(description="Generated test code")
     dependencies: list[str] = Field(default_factory=list, description="Required pip packages")
+
+
+# ---------------------------------------------------------------------------
+# Layer 2 — Diagnosis models
+# ---------------------------------------------------------------------------
+
+
+class Classification(str, Enum):
+    TEST_ISSUE = "test_issue"
+    INFRA_ISSUE = "infra_issue"
+    PRODUCT_BUG = "product_bug"
+    UNKNOWN = "unknown"
+
+
+class Confidence(str, Enum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+class Severity(str, Enum):
+    P0 = "P0"
+    P1 = "P1"
+    P2 = "P2"
+    P3 = "P3"
+
+
+class FailedTest(BaseModel):
+    name: str = Field(description="Fully qualified test name")
+    error_message: str = Field(description="Error or assertion message")
+    traceback: str = Field(default="", description="Full stack trace")
+    duration: float = Field(default=0.0, description="Execution time in seconds")
+    stdout: str = Field(default="", description="Captured stdout")
+
+
+class Hypothesis(BaseModel):
+    classification: Classification
+    evidence_for: list[str] = Field(description="Evidence supporting this hypothesis")
+    evidence_against: list[str] = Field(description="Evidence contradicting this hypothesis")
+
+
+class Diagnosis(BaseModel):
+    test_name: str = Field(description="Which test was diagnosed")
+    classification: Classification = Field(description="Final classification")
+    confidence: Confidence = Field(description="How confident is this diagnosis")
+    severity: Severity = Field(description="Priority for action")
+    probable_cause: str = Field(description="Most likely root cause explanation")
+    hypotheses: list[Hypothesis] = Field(description="All evaluated hypotheses")
+    recommended_action: str = Field(description="What to do next")
+    evidence_summary: str = Field(description="Key evidence that led to this conclusion")
+
+
+class DiagnosisReport(BaseModel):
+    total_tests: int
+    passed: int
+    failed: int
+    skipped: int
+    failures: list[Diagnosis] = Field(description="Diagnosis for each failed test")
+    summary: str = Field(description="Overall assessment")
+
+
+# ---------------------------------------------------------------------------
+# Layer 3 — Orchestration models
+# ---------------------------------------------------------------------------
+
+
+class PipelineStage(str, Enum):
+    GENERATE = "generate"
+    EXECUTE = "execute"
+    DIAGNOSE = "diagnose"
+    REPORT = "report"
+
+
+class PipelineResult(BaseModel):
+    feature: str = Field(description="Feature that was tested")
+    stages_completed: list[PipelineStage] = Field(default_factory=list)
+    test_suite: TestSuite | None = None
+    code_output: CodeOutput | None = None
+    diagnosis: DiagnosisReport | None = None
+    report_path: str | None = Field(default=None, description="Path to generated report")
+    github_issue_url: str | None = Field(default=None, description="URL if issue was filed")

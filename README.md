@@ -1,8 +1,31 @@
-# AI Test Generator
+# AI Test Generator — Agentic QA
 
-Generate comprehensive test cases and executable test code from user stories — powered by Claude.
+An autonomous, 3-layer QA system powered by Claude. Goes beyond "AI writes tests" — it generates, executes, diagnoses, and reports. Each layer works standalone or chains into a full pipeline.
 
-Give it a feature description, get back structured test cases (happy path, edge cases, negative, boundary, security) and optionally generate `pytest` or `playwright` code.
+```
+┌─────────────────────────────────────────────────────────┐
+│                   AGENTIC QA PIPELINE                   │
+│                                                         │
+│  ┌─────────────┐   ┌──────────────┐   ┌─────────────┐  │
+│  │   Layer 1   │──▶│   Layer 2    │──▶│   Layer 3   │  │
+│  │  Generate   │   │  Diagnose    │   │ Orchestrate │  │
+│  │             │   │              │   │             │  │
+│  │ User Story  │   │ Differential │   │ Full Pipeline│  │
+│  │ → Test Cases│   │ Diagnosis    │   │ + Reporting │  │
+│  │ → Code      │   │ 3 Hypotheses │   │ + GitHub    │  │
+│  └─────────────┘   └──────────────┘   └─────────────┘  │
+└─────────────────────────────────────────────────────────┘
+```
+
+## What Makes This Different
+
+Most "AI testing" tools stop at test generation. This system:
+
+- **Generates** structured test cases with priority, type, and coverage analysis
+- **Produces** executable pytest or Playwright code (not pseudocode)
+- **Diagnoses** failures using differential diagnosis — evaluates 3 hypotheses (test issue vs infra issue vs product bug) against evidence
+- **Reports** with confidence scores, severity rankings (P0-P3), and actionable recommendations
+- **Files GitHub issues** automatically for confirmed product bugs
 
 ## Quick Start
 
@@ -14,86 +37,157 @@ pip install -e ".[dev]"
 
 # Set your API key
 export ANTHROPIC_API_KEY=sk-ant-xxxxx
+```
 
-# Generate test cases from a one-liner
+## Layer 1 — Test Generation
+
+Generate test cases from any feature description or user story.
+
+```bash
+# From a one-liner
 ai-test-gen generate "User login with email and password"
 
-# Generate from a detailed requirements file
-ai-test-gen generate examples/login_feature.md --output test_suite.json
+# From a requirements file
+ai-test-gen generate requirements.md --output test_suite.json
 
 # Generate pytest code from the test suite
 ai-test-gen code test_suite.json --framework pytest --output test_login.py
 
-# Or do both in one shot
+# Or both in one shot
 ai-test-gen one-shot "Shopping cart checkout" --framework playwright -d ./tests
 ```
 
-## Commands
+**What you get:**
+- 8-12 test cases covering happy path, edge cases, negative, boundary, security, accessibility
+- Prioritized by severity (critical → low)
+- Tagged for filtering
+- Executable code with proper fixtures, assertions, and markers
 
-### `generate` — Create test cases
+## Layer 2 — Failure Diagnosis
 
-```bash
-ai-test-gen generate "feature description or path/to/file.md" [OPTIONS]
-
-Options:
-  -c, --context   Additional context (API docs, constraints, etc.)
-  -o, --output    Save test suite JSON to file
-  -m, --model     Claude model (default: claude-sonnet-4-20250514)
-```
-
-### `code` — Generate executable tests
+Point it at any test results file and get a differential diagnosis.
 
 ```bash
-ai-test-gen code test_suite.json [OPTIONS]
+# Diagnose pytest JSON report
+ai-test-gen diagnose report.json
 
-Options:
-  -f, --framework   pytest or playwright (default: pytest)
-  -o, --output      Save code to file
-  -m, --model       Claude model
+# Diagnose JUnit XML (works with any framework)
+ai-test-gen diagnose results.xml --format junit-xml --output triage.md
 ```
 
-### `one-shot` — Generate everything at once
+**How diagnosis works:**
+
+For each failure, the agent evaluates three hypotheses:
+
+| Hypothesis | Meaning |
+|------------|---------|
+| `test_issue` | Test code is broken (bad locator, flaky wait, wrong assertion) |
+| `infra_issue` | Infrastructure problem (timeout, DNS, container crash) |
+| `product_bug` | Actual defect in the application under test |
+
+Each hypothesis gets evidence **for** and **against**. Classification only happens when one hypothesis clearly dominates. When evidence is split → `unknown` (better than guessing wrong).
+
+Output includes:
+- Confidence: high / medium / low
+- Severity: P0 (critical) → P3 (low)
+- Probable cause (not "root cause" — we're analyzing logs, not debugging live)
+- Recommended next action
+
+## Layer 3 — Full Pipeline
+
+Run the entire agentic QA pipeline autonomously.
 
 ```bash
-ai-test-gen one-shot "feature description" [OPTIONS]
+# Full pipeline: generate → execute → diagnose → report
+ai-test-gen pipeline "User login with email and password"
 
-Options:
-  -c, --context      Additional context
-  -f, --framework    pytest or playwright
-  -d, --output-dir   Directory for output files (default: .)
-  -m, --model        Claude model
+# With auto GitHub issue filing for product bugs
+ai-test-gen pipeline "Checkout flow" --auto-issue --github-repo myuser/myapp
+
+# Specify output directory
+ai-test-gen pipeline requirements.md -d ./agentic_output
 ```
 
-## Example Output
+**What happens:**
+1. Generates test cases from your feature description
+2. Produces executable pytest code
+3. Runs the tests
+4. Diagnoses every failure with differential diagnosis
+5. Generates a markdown triage report
+6. Optionally files GitHub issues for confirmed product bugs
+
+## All CLI Commands
 
 ```
-$ ai-test-gen generate "User login with email and password"
-
-Generated 10 test cases
-
-┌──────────────────────────────────────────────────────────────┐
-│ ID      │ Title                              │ Type      │ P │
-├──────────────────────────────────────────────────────────────┤
-│ TC-001  │ Successful login with valid creds  │ functional│ C │
-│ TC-002  │ Login fails with wrong password    │ negative  │ H │
-│ TC-003  │ Account lockout after 5 failures   │ security  │ H │
-│ TC-004  │ Empty email field validation       │ negative  │ M │
-│ TC-005  │ SQL injection in email field       │ security  │ C │
-│ ...     │ ...                                │ ...       │ . │
-└──────────────────────────────────────────────────────────────┘
+ai-test-gen generate   — Layer 1: Generate test cases from feature description
+ai-test-gen code       — Layer 1: Generate test code from test suite JSON
+ai-test-gen one-shot   — Layer 1: Generate cases + code in one command
+ai-test-gen diagnose   — Layer 2: Diagnose failures from test results file
+ai-test-gen pipeline   — Layer 3: Run the full agentic pipeline
 ```
 
-## How It Works
+## Supported Formats
 
-1. Your feature description is sent to Claude with an expert SDET system prompt
-2. Claude generates structured test cases covering functional, edge, negative, boundary, security, and accessibility scenarios
-3. Optionally, the test suite is fed back to Claude to generate framework-specific test code
-4. Everything is validated through Pydantic models for type safety
+| Input | Formats |
+|-------|---------|
+| Feature descriptions | Inline text, `.md`, `.txt` files |
+| Test results (diagnosis) | pytest-json-report (`.json`), JUnit XML (`.xml`) |
+| Generated code | pytest, Playwright |
+
+## Example Triage Report
+
+```
+# Agentic QA Triage Report
+
+## Summary
+| Metric      | Count |
+|-------------|-------|
+| Total Tests | 10    |
+| Passed      | 8     |
+| Failed      | 2     |
+
+## Failure Details
+
+### 1. test_login::test_account_lockout
+| Classification   | Confidence | Severity |
+|------------------|------------|----------|
+| 🐛 product_bug   | 🟢 high    | **P1**   |
+
+**Probable Cause**: Lockout counter not incrementing after failed attempts
+**Recommended Action**: Check auth service lockout logic
+
+### 2. test_login::test_session_timeout
+| Classification   | Confidence | Severity |
+|------------------|------------|----------|
+| ❓ unknown        | 🔴 low     | **P3**   |
+
+**Probable Cause**: Evidence split — could be stale selector, slow CI, or UI change
+**Recommended Action**: Re-run locally, verify selector still valid
+```
 
 ## Running Tests
 
 ```bash
 pytest tests/ -v
+```
+
+27 tests covering all three layers — generators, parsers, diagnoser, and reporters.
+
+## Architecture
+
+```
+src/ai_test_generator/
+├── generator.py          # Layer 1: Claude-powered test generation
+├── diagnoser.py          # Layer 2: Differential diagnosis engine
+├── orchestrator.py       # Layer 3: Full pipeline orchestration
+├── models.py             # Pydantic models for all layers
+├── cli.py                # CLI interface (click + rich)
+├── parsers/
+│   ├── pytest_parser.py  # Parse pytest-json-report output
+│   └── junit_parser.py   # Parse JUnit XML (universal)
+└── reporters/
+    ├── markdown_reporter.py  # Generate triage reports
+    └── github_reporter.py    # File GitHub issues via gh CLI
 ```
 
 ## License
