@@ -131,3 +131,57 @@ class PipelineResult(BaseModel):
     diagnosis: DiagnosisReport | None = None
     report_path: str | None = Field(default=None, description="Path to generated report")
     github_issue_url: str | None = Field(default=None, description="URL if issue was filed")
+
+
+# ---------------------------------------------------------------------------
+# Failure Memory models
+# ---------------------------------------------------------------------------
+
+
+class Correction(BaseModel):
+    test_name: str = Field(description="Test that was corrected")
+    original_classification: Classification
+    corrected_classification: Classification
+    reason: str = Field(description="Why the correction was made")
+    error_pattern: str = Field(description="Key error pattern for future matching")
+    timestamp: str = Field(description="ISO 8601 timestamp of correction")
+
+
+class MemoryMatch(BaseModel):
+    correction: Correction
+    similarity: str = Field(description="How this past correction relates to current failure")
+
+
+# ---------------------------------------------------------------------------
+# PR Impact Analysis models
+# ---------------------------------------------------------------------------
+
+
+class RiskLevel(str, Enum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+class FileChange(BaseModel):
+    path: str = Field(description="File path that changed")
+    change_type: str = Field(description="added, modified, deleted, renamed")
+    diff_summary: str = Field(description="Summary of what changed in this file")
+
+
+class TestImpact(BaseModel):
+    test_file: str = Field(description="Test file at risk")
+    test_name: str = Field(default="", description="Specific test function if identifiable")
+    risk_level: RiskLevel = Field(description="How likely this test will break")
+    reason: str = Field(description="Why this test is at risk")
+    changed_file: str = Field(description="Which changed file affects this test")
+
+
+class ImpactReport(BaseModel):
+    total_files_changed: int
+    total_tests_at_risk: int
+    high_risk: list[TestImpact] = Field(default_factory=list)
+    medium_risk: list[TestImpact] = Field(default_factory=list)
+    low_risk: list[TestImpact] = Field(default_factory=list)
+    summary: str = Field(description="Overall impact assessment")
+    recommendation: str = Field(description="What to run and in what order")

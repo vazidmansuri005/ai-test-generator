@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-test-generator"
-version = "1.0.0"
+version = "2.0.0"
 description = "Agentic QA — AI-powered test generation, failure diagnosis, and autonomous triage pipeline"
 readme = "README.md"
 license = {text = "MIT"}

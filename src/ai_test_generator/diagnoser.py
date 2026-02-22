@@ -21,6 +21,7 @@ from .models import (
     FailedTest,
     Severity,
 )
+from .memory import FailureMemory
 
 
 DIAGNOSIS_SYSTEM = """You are an expert test failure diagnostician. Your job is to perform
@@ -101,9 +102,15 @@ Return ONLY valid JSON, no markdown fences."""
 class FailureDiagnoser:
     """Diagnoses test failures using differential diagnosis via Claude."""
 
-    def __init__(self, api_key: str | None = None, model: str = "claude-sonnet-4-20250514"):
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str = "claude-sonnet-4-20250514",
+        memory: FailureMemory | None = None,
+    ):
         self.client = Anthropic(api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"))
         self.model = model
+        self.memory = memory
 
     def diagnose(
         self,
@@ -158,6 +165,12 @@ class FailureDiagnoser:
             skipped=skipped,
             failures_json=failures_json,
         )
+
+        # Inject failure memory context if available
+        if self.memory:
+            memory_context = self.memory.get_context_for_diagnosis(failures_json)
+            if memory_context:
+                prompt += memory_context
 
         response = self.client.messages.create(
             model=self.model,
